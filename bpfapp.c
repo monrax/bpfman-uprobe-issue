@@ -1,0 +1,59 @@
+//go:build ignore
+
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
+#ifndef PIN_BY_NAME
+    #define PIN_BY_NAME 0 
+#endif
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u32);
+    __type(value, __u32);
+    __uint(max_entries, 10);
+    #if PIN_BY_NAME
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    #endif
+} rcount SEC(".maps");
+
+
+static int print_got_here(char* caller) {
+    const static char m[] = "[%s] got here!";
+    bpf_trace_printk(m, sizeof(m), caller);
+
+    return 0;
+}
+
+static long count(__u32 *key) {
+    __u32* count = bpf_map_lookup_elem(&rcount, key);
+    if (count == NULL) {
+        __u32 one = 1;
+        return bpf_map_update_elem(&rcount, key, &one, BPF_NOEXIST);
+    } else {
+        (*count)++;
+        return bpf_map_update_elem(&rcount, key, count, BPF_EXIST);
+    }
+}
+
+SEC("uprobe/SSL_read")
+int entry_ssl_read(void* ctx) {
+    print_got_here("uprobe/SSL_read");
+
+    __u32 pid = bpf_get_current_pid_tgid() >> 32;
+    count(&pid);
+
+    return 0;
+}
+
+SEC("uretprobe/SSL_read")
+int ret_ssl_read(void* ctx) {
+    print_got_here("uretprobe/SSL_read");
+
+    __u32 cafe = (__u32) 0xbebecafe;
+    count(&cafe);
+
+    return 0;
+}
+
+char __license[] SEC("license") = "Dual MIT/GPL";

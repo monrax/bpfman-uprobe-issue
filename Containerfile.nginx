@@ -1,0 +1,27 @@
+FROM quay.io/bpfman/bpfman:v0.5.6
+
+ARG b64conf="dXNlciB3d3ctZGF0YTsKd29ya2VyX3Byb2Nlc3NlcyAxOwpwaWQ\
+gL3J1bi9uZ2lueC5waWQ7CmVycm9yX2xvZyAvdmFyL2xvZy9uZ2lueC9lcnJvci5\
+sb2c7CmluY2x1ZGUgL2V0Yy9uZ2lueC9tb2R1bGVzLWVuYWJsZWQvKi5jb25mOwo\
+KZXZlbnRzIHsKICB3b3JrZXJfY29ubmVjdGlvbnMgNzY4Owp9CgoKaHR0cCB7CiA\
+gc2VydmVyIHsKICAgIGxpc3RlbiA4MDgwIHNzbDsKICAgIHNlcnZlcl9uYW1lIG5\
+lcHR1bmU7CiAgICBzc2xfY2VydGlmaWNhdGUgICAgICAgIC9ldGMvbmdpbngvZGF\
+0YS90bHMvbmdpbnguY3J0OwogICAgc3NsX2NlcnRpZmljYXRlX2tleSAgICAvZXR\
+jL25naW54L2RhdGEvdGxzL25naW54LmtleTsKICAgIHNzbF9wcm90b2NvbHMgVEx\
+TdjEgVExTdjEuMSBUTFN2MS4yIFRMU3YxLjM7CiAgICBzc2xfY2lwaGVycyBISUd\
+IOiFhTlVMTDohTUQ1OwogICAgICAKICAgIGxvY2F0aW9uIC8gewogICAgICBhZGR\
+faGVhZGVyIHgtY2xpZW50LXBvcnQgJHJlbW90ZV9wb3J0OwogICAgICBhZGRfaGV\
+hZGVyIHgtc2VydmVyLXBvcnQgJHNlcnZlcl9wb3J0OwogICAgICByb290IC9ldGM\
+vbmdpbngvZGF0YS93d3c7CiAgICB9CiAgICBsb2NhdGlvbiAvaW1hZ2VzIHsKICA\
+gICAgcm9vdCAvZXRjL25naW54L2RhdGE7CiAgICB9CiAgfQp9Cgo="
+
+ARG b64index="PCFET0NUWVBFIGh0bWw+CjxodG1sPgoJPGhlYWQ+CgkJPHRpdG\
+xlPmhvd2R5PC90aXRsZT4KCTwvaGVhZD4KCTxib2R5PgoJCTxkaXY+PGgzPmhlbG\
+xvIHdvcmxkITwvaDM+PC9kaXY+CgkJPGRpdj48cD5sb3JlbSBpcHN1bT88L3A+PC\
+9kaXY+CgkJPGRpdj48aW1nIHNyYz0iLi4vcGlnLnBuZyI+PC9kaXY+Cgk8L2JvZH\
+k+CjwvaHRtbD4K"
+
+RUN apt update -y && apt install -y nginx vim nano wget curl
+RUN mkdir -p /etc/nginx/data/tls /etc/nginx/data/www && echo ${b64index} | base64 -d > /etc/nginx/data/www/index.html && echo '{"hello": "world"}' > /etc/nginx/data/www/json && echo ${b64conf} | base64 -d > /etc/nginx/nginx.conf
+RUN openssl req -x509 -newkey rsa:4096 -keyout /etc/nginx/data/tls/nginx.key -out /etc/nginx/data/tls/nginx.crt -sha256 -days 365 -nodes -subj "/C=US/ST=Texas/L=Houston/O=Graylog/OU=APISEC/CN=neptune"
+ENTRYPOINT [ "/bin/bash", "-c", "nginx && ./bpfman-rpc --timeout=0" ]
