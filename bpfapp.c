@@ -25,11 +25,18 @@ static int print_got_here(char* caller) {
     return 0;
 }
 
-static long count(__u32 *key) {
+static long count(__u32 *key, int isretprobe) {
     __u32* count = bpf_map_lookup_elem(&rcount, key);
     if (count == NULL) {
-        __u32 one = 1;
-        return bpf_map_update_elem(&rcount, key, &one, BPF_NOEXIST);
+        if (isretprobe == 0) {
+            __u32 one = 1;
+            return bpf_map_update_elem(&rcount, key, &one, BPF_NOEXIST);
+        } else {
+            const static char m[] = "This is NULL!";
+            bpf_trace_printk(m, sizeof(m));
+
+            return 1;
+        }
     } else {
         (*count)++;
         return bpf_map_update_elem(&rcount, key, count, BPF_EXIST);
@@ -40,8 +47,8 @@ SEC("uprobe/SSL_read")
 int entry_ssl_read(void* ctx) {
     print_got_here("uprobe/SSL_read");
 
-    __u32 pid = bpf_get_current_pid_tgid() >> 32;
-    count(&pid);
+    __u32 cafe = (__u32) 0xbebecafe;
+    count(&cafe, 0);
 
     return 0;
 }
@@ -51,7 +58,7 @@ int ret_ssl_read(void* ctx) {
     print_got_here("uretprobe/SSL_read");
 
     __u32 cafe = (__u32) 0xbebecafe;
-    count(&cafe);
+    count(&cafe, 1);
 
     return 0;
 }
