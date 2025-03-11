@@ -32,7 +32,7 @@ static long count(__u32 *key, int isretprobe) {
             __u32 one = 1;
             return bpf_map_update_elem(&rcount, key, &one, BPF_NOEXIST);
         } else {
-            const static char m[] = "This is NULL!";
+            const static char m[] = "[ERROR] Trying to access map with nonexistent key from Uretprobe first";
             bpf_trace_printk(m, sizeof(m));
 
             return 1;
@@ -49,6 +49,9 @@ int entry_ssl_read(void* ctx) {
 
     __u32 cafe = (__u32) 0xbebecafe;
     count(&cafe, 0);
+
+    __u32 pid = bpf_get_current_pid_tgid() >> 32;
+    count(&pid, 0);
 
     return 0;
 }
