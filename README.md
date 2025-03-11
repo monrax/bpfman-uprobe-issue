@@ -12,9 +12,13 @@ Go application `app.go` each second, printing out any new available key-value pa
 
 The app consists of two programs: `entry_ssl_read` (**uprobe**) and `ret_ssl_read` (**uretprobe**).
 
-Each time `entry_ssl_read` executes, it updates the count using the current PID as key.
+Each time `entry_ssl_read` executes, it updates the count for the current process, using its PID as a map key.
+In addition, it updates the count for another map entry that uses a pre-defined hard-coded u32 key (0xBEBECAFE).
+If any of the keys do not exist in the `rcount` map (i.e. if it's the first time updating the map for a given
+key), it creates the entry accordingly.
 
-Each time `ret_ssl_read` executes, it updates the count using a hard-coded u32 (0xBEBECAFE) as key.
+Each time `ret_ssl_read` executes, it attempts to update the count for the hard-coded u32 0xBEBECAFE key.
+It prints out an error message and returns 1 if there was an attempt to access the map using a nonexistent key.
 
 In addition, each time any of these programs executes, a new message is logged to `/sys/kernel/tracing/trace`
 using `bpf_trace_printk` with the following format:
@@ -65,7 +69,7 @@ curl https://httpbin.org/get
 2025/03/10 12:15:02 howdy!
 2025/03/10 12:15:02 Waiting for SSL_read calls...
 2025/03/10 12:15:05 Map: rcount, PID: 6679 [1a17], count: 2
-2025/03/10 12:15:05 Map: rcount, PID: 3200174846 [bebecafe], count: 2
+2025/03/10 12:15:05 Map: rcount, PID: 3200174846 [bebecafe], count: 4
 ```
 
 - Finally, we can stop our program with `ctrl + c` and read our `bpf_trace_printk` messages
@@ -121,7 +125,7 @@ curl -k https://neptune:8080/json
 ```
 2025/03/10 12:14:56 howdy!
 2025/03/10 12:14:56 Waiting for SSL_read calls...
-2025/03/10 12:15:05 Map: rcount, PID: 3200174846 [bebecafe], count: 3
+2025/03/10 12:15:05 Map: rcount, PID: 3200174846 [bebecafe], count: 6
 2025/03/10 12:15:05 Map: rcount, PID: 22157 [568d], count: 3
 ```
 
@@ -155,6 +159,11 @@ In the following cases 3 and 4, the `--tags=bpfman` Go build tag is set in order
 2. Adds `__uint(pinning, LIBBPF_PIN_BY_NAME);` to the `rcount` map definition in `bpfapp.c`.
 
 ### Case 3: Running the app from target container, with bpfman-rpc server
+
+- Remove any previous references to the pinned `rcount` map
+```sh
+sudo rm /sys/fs/bpf/rcount
+```
 
 - Build the target bpfman-nginx container and verify it is running
 
@@ -200,13 +209,13 @@ curl -k https://neptune:8080/json
 2025/03/10 12:25:56 maps:
 2025/03/10 12:25:56  - rcount: /run/bpfman/fs/maps/158/rcount
 2025/03/10 12:25:56 Waiting for SSL_read calls...
-2025/03/10 12:26:13 Map: rcount, PID: 3200174846 [bebecafe], count: 3
+2025/03/10 12:26:13 Map: rcount, PID: 3200174846 [bebecafe], count: 6
 2025/03/10 12:26:13 Map: rcount, PID: 23770 [5cda], count: 3
 ```
 
 - Finally, we can stop our program with `ctrl + c`, `exit` the container shell, and read our `bpf_trace_printk` messages
 
-```
+```sh
 sudo cat /sys/kernel/tracing/trace
 ```
 
@@ -226,6 +235,11 @@ With the outcome being first `uprobe`, then `uretprobe` as expected.
 
 
 ### Case 4: Running the app from another container
+
+- Remove any previous references to the pinned `rcount` map
+```sh
+sudo rm /sys/fs/bpf/rcount
+```
 
 - Build the target nginx container and verify it is running
 
@@ -268,10 +282,10 @@ curl -k https://neptune:8080/json
 2025/03/10 13:18:34  - rcount: /run/bpfman/fs/maps/76/rcount
 2025/03/10 13:18:34 Waiting for SSL_read calls...
 2025/03/10 13:18:38 Map: rcount, PID: 6600 [19c8], count: 3
-2025/03/10 13:18:38 Map: rcount, PID: 3200174846 [bebecafe], count: 3
+2025/03/10 13:18:38 Map: rcount, PID: 3200174846 [bebecafe], count: 5
 ```
 
-- Finally, we can stop our program with `ctrl + c`, `exit` the container shell, and read our `bpf_trace_printk` messages
+- Finally, we can stop our program with `ctrl + c`, and read our `bpf_trace_printk` messages
 
 ```
 sudo cat /sys/kernel/tracing/trace
@@ -281,16 +295,22 @@ sudo cat /sys/kernel/tracing/trace
 ```
 #           TASK-PID     CPU#  |||||  TIMESTAMP  FUNCTION
 #              | |         |   |||||     |         |
-           nginx-6600    [006] ...11   172.719103: bpf_trace_printk: [uretprobe/SSL_read] got here!
-           nginx-6600    [006] ...11   172.719107: bpf_trace_printk: [uprobe/SSL_read] got here!
-           nginx-6600    [006] ...11   172.719129: bpf_trace_printk: [uretprobe/SSL_read] got here!
-           nginx-6600    [006] ...11   172.719130: bpf_trace_printk: [uprobe/SSL_read] got here!
-           nginx-6600    [006] ...11   172.719575: bpf_trace_printk: [uretprobe/SSL_read] got here!
-           nginx-6600    [006] ...11   172.719577: bpf_trace_printk: [uprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891104: bpf_trace_printk: [uretprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891107: bpf_trace_printk: [ERROR] Trying to access map with nonexistent key from Uretprobe first
+           nginx-6600    [006] ...11  1695.891110: bpf_trace_printk: [uprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891158: bpf_trace_printk: [uretprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891160: bpf_trace_printk: [uprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891647: bpf_trace_printk: [uretprobe/SSL_read] got here!
+           nginx-6600    [006] ...11  1695.891652: bpf_trace_printk: [uprobe/SSL_read] got here!
 ```
 
 With the outcome being first `uretprobe`, then `uprobe` which is **NOT** the expected outcome.
 
+## Remove all containers, generated files and binaries
+
+```sh
+make stop clean
+```
 
 ## Makefile ref
 
