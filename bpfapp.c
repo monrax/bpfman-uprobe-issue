@@ -47,13 +47,11 @@ SEC("uprobe/SSL_read")
 int entry_ssl_read(void* ctx) {
     print_got_here("uprobe/SSL_read");
 
-    __u32 cafe = (__u32) 0xbebecafe;
-    count(&cafe, 0);
-
     __u32 pid = bpf_get_current_pid_tgid() >> 32;
     count(&pid, 0);
 
-    return 0;
+    __u32 cafe = (__u32) 0xbebecafe;
+    return count(&cafe, 0);
 }
 
 SEC("uretprobe/SSL_read")
@@ -61,9 +59,7 @@ int ret_ssl_read(void* ctx) {
     print_got_here("uretprobe/SSL_read");
 
     __u32 cafe = (__u32) 0xbebecafe;
-    count(&cafe, 1);
-
-    return 0;
+    return count(&cafe, 1);
 }
 
 char __license[] SEC("license") = "Dual MIT/GPL";
