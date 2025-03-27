@@ -9,8 +9,8 @@ Found this issue while attempting to attach probes to OpenSSL function calls fro
 <ul>
 <li><a href="#the-app">The app</a></li>
 <li><a href="#the-files">The files</a></li>
-<li><a href="#ebpf-go">Using Cilium's ebpf-go</a></li>
-<li><a href="#bpfman">Using Bpfman</a></li>
+<li><a href="#cilium">Two examples using Cilium's ebpf-go</a></li>
+<li><a href="#bpfman">Two examples using Bpfman</a></li>
 </ul>
 
 ## The app
