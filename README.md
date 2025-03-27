@@ -4,6 +4,15 @@ When running a simple eBPF application comprised of one `uprobe` and one` uretpr
 
 Found this issue while attempting to attach probes to OpenSSL function calls from one container to another using bpfman.
 
+## Contents
+
+<ul>
+<li><a href="#the-app">The app</a></li>
+<li><a href="#the-files">The files</a></li>
+<li><a href="#ebpf-go">Using Cilium's ebpf-go</a></li>
+<li><a href="#bpfman">Using Bpfman</a></li>
+</ul>
+
 ## The app
 
 `bpfapp.c` is a simple eBPF application that counts each call made from a different process to the OpenSSL 
@@ -43,6 +52,8 @@ with `<program type>` being either `uprobe` or `uretprobe` accordingly.
 - `Containerfile.app`: defines a container image built from `quay.io/bpfman/bpfman:v0.5.6`, that includes both the final `app` executable and the clang-built `app_x86_bpfel.o` object file.
 
 - `Containerfile.nginx`: defines a container image built from `quay.io/bpfman/bpfman:v0.5.6`, that includes a TLS-enabled nginx application that exposes the `/` and `/json` endpoints through port `8080`.
+
+<a name="cilium"></a>
 
 ## Using Cilium's ebpf-go
 
@@ -149,6 +160,7 @@ sudo cat /sys/kernel/tracing/trace
 
 With the outcome being first `uprobe`, then `uretprobe` as expected as well.
 
+<a name="bpfman"></a>
 
 ## Using Bpfman
 
